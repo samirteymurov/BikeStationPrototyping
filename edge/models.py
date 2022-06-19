@@ -1,4 +1,4 @@
-import enum
+import enum, json
 from sqlalchemy import Column, Integer, DateTime, Boolean, Enum
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
@@ -16,7 +16,7 @@ Base = declarative_base()
 
 class Status(enum.Enum):
     created = 0
-    sent = 1
+    processed = 1
     failed = 2
     waiting = 3
 
@@ -34,6 +34,24 @@ class SpotSensorData(Base):
         session.add(self)
         session.commit()
         return self
+
+    @staticmethod
+    def get_last_n_readings(n):
+        return session.query(SpotSensorData).filter(SpotSensorData.sent_status==Status.created).limit(n).all()
+
+    @staticmethod
+    def set_to_processed(last_read_id):
+        session.query(SpotSensorData).filter(SpotSensorData.read_id <= last_read_id).update({"sent_status": Status.processed})
+        session.commit()
+
+    @staticmethod
+    def encode_query(query):
+        summary_dict = {'0': [], '1': [], '2': [], '3': [], '4': [], '5': []}
+        for reading in query:
+            spot_id = reading.spot_id
+            summary_dict[str(spot_id)].append(
+                [{'datetime': reading.read_timestamp, 'is_occupied': reading.is_occupied}])
+        return json.dumps(summary_dict, default=str).encode()
 
 
 Base.metadata.create_all(engine)
