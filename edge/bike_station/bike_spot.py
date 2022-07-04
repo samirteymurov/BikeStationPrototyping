@@ -24,10 +24,10 @@ class BikeSpot:
         spot_state_info.update(self._get_reservation_state())
         return spot_state_info
 
-    def reserve(self, code_to_unlock, duration):
+    def reserve(self, reservation_id, duration):
         """Create reservation for spot."""
         if self.occupied_sensor.occupied and not self.reservation_state.is_reserved:
-            self.reservation_state.make_reservation(code_to_unlock, duration)
+            self.reservation_state.make_reservation(reservation_id, duration)
 
     def _update_spot_state(self):
         """Simulates bike is staying/getting removed/just being parked at empty spot
@@ -53,15 +53,15 @@ class BikeSpot:
     def _get_reservation_state(self):
         reservation_state_dict = dict(
             reserved=self.reservation_state.is_reserved,
-            last_code_to_unlock=self.reservation_state.last_code_to_unlock,
+            last_reservation_state=self.reservation_state.last_reservation_id,
         )
         if self.reservation_state.is_reserved:
             reservation_state_dict[
                 "remaining_reservation_time"
             ] = self.reservation_state.remaining_time
             reservation_state_dict[
-                "code_to_unlock"
-            ] = self.reservation_state.current_code_to_unlock
+                "reservation_id"
+            ] = self.reservation_state.reservation_id
 
         return reservation_state_dict
 
@@ -73,8 +73,8 @@ class ReservationState:
             2000, 1, 1, 0, 0, 0, tzinfo=pytz.utc
         )
         self.reservation_created_at = self.default_created_at
-        self.current_code_to_unlock = 0
-        self.last_code_to_unlock = None  # only for monitoring/testing purposes
+        self.reservation_id = 0
+        self.last_reservation_id = None  # only for monitoring/testing purposes
         self.duration = 0
 
     @property
@@ -91,14 +91,14 @@ class ReservationState:
             - (datetime.datetime.utcnow() - self.reservation_created_at).total_seconds()
         )
 
-    def make_reservation(self, code_to_unlock, duration):
+    def make_reservation(self, reservation_id, duration):
         self.reservation_created_at = datetime.datetime.utcnow()
-        self.current_code_to_unlock = code_to_unlock
+        self.reservation_id = reservation_id
         self.duration = duration
 
     def end_reservation_if_exists(self):
         if self.is_reserved:
             self.reservation_created_at = self.default_created_at
-            self.last_code_to_unlock = self.current_code_to_unlock
-            self.current_code_to_unlock = 0
+            self.last_reservation_id = self.reservation_id
+            self.reservation_id = 0
             self.duration = 0

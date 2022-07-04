@@ -109,27 +109,27 @@ class BikeStation:
         )
         print("\n---------------------------------------- Station info --------------------------------------")
         print(
-            "{:<12} | {:<8} | {:<18} | {:<8} | {:<26} | {:<19} | {:<16}".format(
+            "{:<12} | {:<8} | {:<18} | {:<8} | {:<26} | {:<22} | {:<19}".format(
                 "Spot ID",
                 "Occupied",
                 "Bike Battery Level",
                 "Reserved",
                 "Remaining Reservation Time",
-                "Current Unlock Code",
-                "Last Unlock Code"
+                "Current Reservation ID",
+                "Last Reservation ID"
             )
         )
         for spot_id, spot_state in spot_states.items():
             battery_level = spot_state.get("bike_battery_level")
             print(
-                "{:<12} | {:<8} | {:<18} | {:<8} | {:<26} | {:<19} | {:<16}".format(
+                "{:<12} | {:<8} | {:<18} | {:<8} | {:<26} | {:<22} | {:<19}".format(
                     spot_id,
                     spot_state["occupied"],
                     "" if not battery_level else str(round(battery_level * 100, 2)),
                     spot_state["reserved"],
                     spot_state.get("remaining_reservation_time") or "",
-                    spot_state.get("code_to_unlock") or "",
-                    spot_state.get("last_code_to_unlock") or "",
+                    spot_state.get("reservation_id") or "",
+                    spot_state.get("last_reservation_id") or "",
                 )
             )
 
