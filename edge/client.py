@@ -1,16 +1,15 @@
 import os, itertools
 import logging
+import time
 import zmq
 from dotenv import load_dotenv
-load_dotenv()
-
 from models import SpotSensorData, Status
 
+load_dotenv()
 logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.INFO)
 
 REQUEST_TIMEOUT = 2500
 server_url = os.getenv("server_address")
-
 context = zmq.Context()
 
 logging.info("Connecting to server...")
@@ -18,13 +17,16 @@ client = context.socket(zmq.REQ)
 client.connect(server_url)
 
 for sequence in itertools.count():
-    queue_data = False
-    # get first n data from db
+    # get oldest n sensor readings from db
     queued_readings = SpotSensorData.get_last_n_readings(10)
-    encoded = SpotSensorData.encode_query(queued_readings)
-    request = queued_readings
+    if len(queued_readings) == 0:
+        logging.info("No new sensor reading to be sent. Waiting...")
+        time.sleep(5)
+        continue
 
-    logging.info("Sending (%s)", request)
+    encoded = SpotSensorData.encode_query(queued_readings)
+
+    logging.info("Sending (%s)", encoded)
     client.send(encoded)
 
     while True:
@@ -49,5 +51,5 @@ for sequence in itertools.count():
         # Create new connection
         client = context.socket(zmq.REQ)
         client.connect(server_url)
-        logging.info("Resending (%s)", request)
+        logging.info("Resending (%s)", encoded)
         client.send(encoded)
