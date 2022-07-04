@@ -6,7 +6,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 
-engine = create_engine('sqlite:///sqlite.db', echo=True)
+engine = create_engine("sqlite:///sqlite.db", echo=True)
 Session = sessionmaker(bind=engine)
 # create a Session
 session = Session()
@@ -28,7 +28,7 @@ class SpotSensorData(Base):
     update_timestamp = Column(DateTime(timezone=True), onupdate=func.now())
     spot_id = Column(Integer, nullable=False)
     is_occupied = Column(Boolean, default=False)
-    sent_status = Column(Enum(Status),default=Status.created)
+    sent_status = Column(Enum(Status), default=Status.created)
 
     def add(self):
         session.add(self)
