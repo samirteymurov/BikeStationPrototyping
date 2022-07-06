@@ -3,6 +3,7 @@ from time import sleep
 
 from edge.bike_station.bike_spot import BikeSpot
 from edge.bike_station.sensors import SolarPanelSensor
+from edge.bike_station import models
 
 
 class BikeStation:
@@ -121,11 +122,14 @@ class BikeStation:
         )
         for spot_id, spot_state in spot_states.items():
             battery_level = spot_state.get("bike_battery_level")
+            models.SpotSensorData(spot_id=spot_id, is_occupied=spot_state["occupied"],
+                                  battery_level=battery_level).add()
             print(
                 "{:<12} | {:<8} | {:<18} | {:<8} | {:<26} | {:<22} | {:<19}".format(
                     spot_id,
                     spot_state["occupied"],
                     "" if not battery_level else str(round(battery_level * 100, 2)),
+                    # TODO do we need below fields?
                     spot_state["reserved"],
                     spot_state.get("remaining_reservation_time") or "",
                     spot_state.get("reservation_id") or "",

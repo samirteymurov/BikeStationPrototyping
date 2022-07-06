@@ -32,7 +32,7 @@ for sequence in itertools.count():
     while True:
         if (client.poll(REQUEST_TIMEOUT) & zmq.POLLIN) != 0:
             reply = client.recv()
-            if int(reply) == 6:  # sanity check with length of sent object
+            if int(reply) == 5:  # sanity check with length of sent object
                 logging.info("Server replied OK (%s)", reply)
                 # status of sent records need to be set to "processed"
                 SpotSensorData.set_to_processed(queued_readings[len(queued_readings)-1].read_id)

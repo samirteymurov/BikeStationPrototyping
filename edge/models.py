@@ -1,12 +1,15 @@
-import enum, json
-from sqlalchemy import Column, Integer, DateTime, Boolean, Enum
+import enum
+import os
+import json
+from sqlalchemy import Column, Integer, DateTime, Boolean, Enum, REAL
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from dotenv import load_dotenv
+load_dotenv()
 
-
-engine = create_engine("sqlite:///sqlite.db", echo=True)
+engine = create_engine(f'sqlite:////{os.getenv("sqlite_absolute_path")}', echo=True)
 Session = sessionmaker(bind=engine)
 # create a Session
 session = Session()
@@ -28,12 +31,18 @@ class SpotSensorData(Base):
     update_timestamp = Column(DateTime(timezone=True), onupdate=func.now())
     spot_id = Column(Integer, nullable=False)
     is_occupied = Column(Boolean, default=False)
+    battery_level = Column(REAL)
     sent_status = Column(Enum(Status), default=Status.created)
 
     def add(self):
         session.add(self)
         session.commit()
         return self
+
+    @staticmethod
+    def clean_processed():
+        session.query(SpotSensorData).filter(SpotSensorData.sent_status==Status.processed).delete()
+        session.commit()
 
     @staticmethod
     def get_last_n_readings(n):
@@ -46,12 +55,16 @@ class SpotSensorData(Base):
 
     @staticmethod
     def encode_query(query):
-        summary_dict = {'0': [], '1': [], '2': [], '3': [], '4': [], '5': []}
+        summary_dict = {'0': [], '1': [], '2': [], '3': [], '4': []}
         for reading in query:
             spot_id = reading.spot_id
             summary_dict[str(spot_id)].append(
                 [{'datetime': reading.read_timestamp, 'is_occupied': reading.is_occupied}])
         return json.dumps(summary_dict, default=str).encode()
+
+
+
+
 
 
 Base.metadata.create_all(engine)
