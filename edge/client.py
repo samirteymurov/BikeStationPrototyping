@@ -17,11 +17,11 @@ client = context.socket(zmq.REQ)
 client.connect(server_url)
 
 for sequence in itertools.count():
+    time.sleep(5)
     # get oldest n sensor readings from db
-    queued_readings = SpotSensorData.get_last_n_readings(10)
+    queued_readings = SpotSensorData.get_oldest_n_readings(10)
     if len(queued_readings) == 0:
         logging.info("No new sensor reading to be sent. Waiting...")
-        time.sleep(5)
         continue
 
     encoded = SpotSensorData.encode_query(queued_readings)
@@ -40,6 +40,7 @@ for sequence in itertools.count():
             else:
                 logging.error("Malformed reply from server: %s", reply)
                 continue
+
         # {REQUEST_TIMEOUT} seconds passed, but no results yet
         logging.warning("No response from server")
         # Socket is confused. Close and remove it.

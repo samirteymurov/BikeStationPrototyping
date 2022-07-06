@@ -1,7 +1,7 @@
 import enum
 import os
 import json
-from sqlalchemy import Column, Integer, DateTime, Boolean, Enum, REAL
+from sqlalchemy import Column, Integer, DateTime, Boolean, Enum, REAL, String
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
 from sqlalchemy import create_engine
@@ -9,7 +9,7 @@ from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
 load_dotenv()
 
-engine = create_engine(f'sqlite:////{os.getenv("sqlite_absolute_path")}', echo=True)
+engine = create_engine(f'sqlite:////{os.getenv("sqlite_absolute_path")}', echo=False)
 Session = sessionmaker(bind=engine)
 # create a Session
 session = Session()
@@ -22,6 +22,23 @@ class Status(enum.Enum):
     processed = 1
     failed = 2
     waiting = 3
+
+
+class Constant(Base):
+    __tablename__ = "constant"
+    name = Column(String, primary_key=True)
+    integer_value = Column(Integer)
+    real_value = Column(REAL)
+    string_value = Column(String)
+
+    def save_or_update(self):
+        session.merge(self)
+        session.commit()
+        return self
+
+    @staticmethod
+    def get_real_value_by_name(name):
+        return session.query(Constant).filter(Constant.name == name).first().real_value
 
 
 class SpotSensorData(Base):
@@ -45,7 +62,7 @@ class SpotSensorData(Base):
         session.commit()
 
     @staticmethod
-    def get_last_n_readings(n):
+    def get_oldest_n_readings(n):
         return session.query(SpotSensorData).filter(SpotSensorData.sent_status==Status.created).limit(n).all()
 
     @staticmethod

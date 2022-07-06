@@ -11,33 +11,34 @@ class BikeStation:
 
     feed_in = None
     self_consumption = None
+    electricity_contract_price = 0.4
+    current_market_price = 0.4
 
-    def __init__(self, number_of_spots):
+    def __init__(self, number_of_spots=5):
         self.number_of_spots = number_of_spots
         self.spots = dict((i, BikeSpot(i)) for i in range(0, number_of_spots))
         # solar panel's production capacity is abstracted to equal exactly the demand
         # of the fully occupied station, i.e. number_of_spots
         self.solar_panel_sensor = SolarPanelSensor(production_capacity=number_of_spots)
-        self.electricity_contract_price = 0.4  # not really based on real world
+        # self.electricity_contract_price = 0.4  # not really based on real world
         self.decide_electricity_usage()
 
     def get_number_of_occupied_spots(self):
         return sum(spot.occupied_sensor.occupied for spot in self.spots.values())
 
-    def decide_electricity_usage(self, current_market_price=None):
+    def decide_electricity_usage(self):
         """Set electricity usage attributes.
         Based upon own current consumption state and market price compared to contract price,
         decide whether to feed in and/or self-consume produced electricity.
         """
         # electricity demand is abstracted to equal the number of occupied spots
+        self.current_market_price = models.Constant.get_real_value_by_name('current_market_price')
         current_demand = self.get_number_of_occupied_spots()
         current_production = self.solar_panel_sensor.current_production
-        if current_market_price is None:
-            # if no information on current market price, assume it is not higher than contract price
-            current_market_price = 0.4
+
         if (
             current_demand == 0
-            or self.electricity_contract_price < current_market_price
+            or self.electricity_contract_price < self.current_market_price
         ):
             # Exclusive feed in
             # No occupied spots means no electricity usage so feed in if producing anything
@@ -85,8 +86,7 @@ class BikeStation:
             (spot_id, spot.get_spot_state()) for spot_id, spot in self.spots.items()
         )
         self.solar_panel_sensor.update_current_production()
-        current_market_price = self.get_current_market_price()
-        self.decide_electricity_usage(current_market_price)
+        self.decide_electricity_usage()
         print("\n-------------------------- Current Electricity info --------------------------------")
         print(
             "{:<12} | {:<10} | {:<16} | {:<18} | {:<14} | {:<16}".format(
@@ -100,12 +100,12 @@ class BikeStation:
         )
         print(
             "{:<12} | {:<10} | {:<16} | {:<18} | {:<14} | {:<16} \n".format(
-                current_market_price,
+                self.current_market_price,
                 self.solar_panel_sensor.current_production,
                 self.self_consumption,
                 self.calculate_self_consumption_savings(),
                 self.feed_in,
-                self.calculate_feed_in_profit(current_market_price),
+                self.calculate_feed_in_profit(self.current_market_price),
             )
         )
         print("\n---------------------------------------- Station info --------------------------------------")
