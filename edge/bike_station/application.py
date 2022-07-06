@@ -56,10 +56,6 @@ class BikeStation:
                 self.feed_in = current_production - current_demand
                 self.self_consumption = current_demand
 
-    def get_current_market_price(self):
-        # TODO this needs to be changed to get info from cloud component
-        return round(random.uniform(0.27, 0.68), 4)
-
     def calculate_feed_in_profit(self, current_market_price):
         if current_market_price is None:
             return "unknown"
