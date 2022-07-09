@@ -1,9 +1,12 @@
+import logging
 import random
 from time import sleep
 
 from edge.bike_station.bike_spot import BikeSpot
 from edge.bike_station.sensors import SolarPanelSensor
 from edge.bike_station import models
+from edge.constants import ELECTRICITY_CONTRACT_KWH_PRICE
+from edge.models import Constant, Reservation, ReservationStatus
 
 
 class BikeStation:
@@ -64,18 +67,38 @@ class BikeStation:
     def calculate_self_consumption_savings(self):
         return round(self.self_consumption * self.electricity_contract_price, 4)
 
-    def reserve_spot(self, spot_id, code_to_unlock, duration):
+    def reserve_spot(self, spot_id, reservation_id, duration):
         spot_to_reserve = self.spots.get(spot_id)
         if (
             spot_to_reserve is not None
             and not spot_to_reserve.reservation_state.is_reserved
+            and not spot_to_reserve.occupied_sensor.occupied
         ):
-            spot_to_reserve.reserve(code_to_unlock, duration)
-            print(
-                f"Reservation made for spot {spot_id} with unlock code {code_to_unlock} for {duration} seconds."
+            spot_to_reserve.reserve(reservation_id, duration)
+            logging.info(
+                f"Reservation made for spot {spot_id} with reservation id {reservation_id} for {duration} seconds."
             )
+            return ReservationStatus.reservation_confirmed, spot_to_reserve.reservation_state.reservation_created_at
+        elif spot_to_reserve.occupied_sensor.occupied:
+            logging.warning(f"Cannot make reservation for spot {spot_id}. Spot is not occupied anymore.")
+            return ReservationStatus.reservation_unfeasible, None
         else:
-            print(f"Cannot make reservation for spot {spot_id}. Is already reserved.")
+            logging.warning(f"Cannot make reservation for spot {spot_id}. Is already reserved.")
+            return ReservationStatus.reservation_unfeasible, None
+
+    def perform_reservations(self):
+        """Make reservations and update changes in DB to enable confirmation message for cloud component"""
+        open_reservations = Reservation.get_open_reservation_requests()
+        for reservation in open_reservations:
+            reservation_state, reservation_created_at = self.reserve_spot(
+                spot_id=reservation.spot_id,
+                reservation_id=reservation.reservation_id,
+                duration=reservation.duration_in_seconds
+            )
+            if reservation_state == ReservationStatus.reservation_confirmed:
+                reservation.set_to_confirmed(reservation_state, reservation_created_at)
+            else:
+                reservation.set_to_unfeasible()
 
     def run_station(self):
         spot_states = dict(
@@ -134,19 +157,25 @@ class BikeStation:
             )
 
 
+
+
 if __name__ == "__main__":
-    print("Starting...")
-    station = BikeStation(5)
+    print("Starting Bike Station Edge Device")
+    # Set market price constant to electricity contract price until cloud component provides actual market price
+    Constant(name='current_market_price', real_value=ELECTRICITY_CONTRACT_KWH_PRICE).save_or_update()
+    # Setup station
+    station = BikeStation()
     while True:
         print(
             "\n \n####################################### GETTING NEW STATION STATE ##################################"
         )
         station.run_station()
-        # make random reservation, should be replaced with making reservations when receiving requests
-        print("\n------------------------------Making Reservation--------------------------------------")
-        station.reserve_spot(
-            spot_id=random.randint(0, 5),
-            code_to_unlock=random.randint(1000, 9999),
-            duration=random.randint(30, 120),
-        )
-        sleep(5)
+        print("\n------------------------------Making Reservations--------------------------------------")
+        # station.reserve_spot(
+        #     spot_id=random.randint(0, 4),
+        #     code_to_unlock=random.randint(1000, 9999),
+        #     duration=random.randint(30, 120),
+        # )
+        sleep(2)
+        station.perform_reservations()
+        sleep(3)

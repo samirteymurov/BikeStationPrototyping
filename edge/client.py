@@ -17,6 +17,7 @@ client = context.socket(zmq.REQ)
 client.connect(server_url)
 
 for sequence in itertools.count():
+    # TODO add reservation confirmations/rejections to message
     time.sleep(5)
     # get oldest n sensor readings from db
     queued_readings = SpotSensorData.get_oldest_n_readings(10)

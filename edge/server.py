@@ -2,12 +2,14 @@ from random import randint
 import os
 import itertools
 import logging
-import time
 import zmq
 import json
 from dotenv import load_dotenv
+
+from edge.constants import ELECTRICITY_CONTRACT_KWH_PRICE
+
 load_dotenv()
-from models import Constant
+from models import Constant, Reservation
 
 logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.INFO)
 context = zmq.Context()
@@ -15,12 +17,37 @@ server = context.socket(zmq.REP)
 print(os.getenv('bind_address'))
 server.bind(os.getenv("bind_address"))
 for cycles in itertools.count():
+    normal_request = True
     request = server.recv()
-    current_market_price = json.loads(request.decode())
+    request_dict = json.loads(request.decode())
+    current_market_price = request_dict.get("current_market_price")
+    if not current_market_price:
+        normal_request = False
+        logging.error("Current market price not provided, using default value..")
+        current_market_price = ELECTRICITY_CONTRACT_KWH_PRICE
     # write it to constants table so that application can read it
-    Constant(name='current_market_price', real_value=current_market_price).add()
+    Constant(name='current_market_price', real_value=current_market_price).save_or_update()
+
+    reservations = request_dict.get("reservations")
+    for reservation_id, reservation_details in reservations.items():
+        # create entry for open reservations that have not been received yet
+        if not Reservation.query().get(reservation_id):
+            try:
+                Reservation(
+                    reservation_id=reservation_id,
+                    spot_id=reservation_details.get("spot_id"),
+                    duration_in_seconds=reservation_details.get("duration"),
+                ).add()
+            except Exception as e:
+                logging.error(
+                    "Something went wrong when processing reservation info: "
+                    + str(e)
+                )
+                normal_request = False
+
     print(request)
-    logging.info("Normal request (%s)", request)
+    if normal_request:
+        logging.info("Normal request (%s)", request)
     # time.sleep(1)
     # after making sure that all data have been processed send ok reply
     server.send('ok'.encode())

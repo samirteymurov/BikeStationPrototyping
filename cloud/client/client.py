@@ -1,9 +1,11 @@
+import json
 import os, itertools
 import logging
-import time
 import random
 import zmq
 from dotenv import load_dotenv
+
+from cloud.models import ReservationRequest
 
 load_dotenv()
 logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.INFO)
@@ -17,12 +19,18 @@ client = context.socket(zmq.REQ)
 client.connect(server_url)
 
 for sequence in itertools.count():
+    current_electricity_price_per_kwh = round(random.uniform(0.27, 0.68), 4)
+    pending_reservations = ReservationRequest.get_pending_reservations()
+    reservations_dict = ReservationRequest.make_query_dictionary(pending_reservations)
 
-    current_electricity_price_per_kw = round(random.uniform(0.27, 0.68), 4)
+    message_dict = {
+        "current_market_price": current_electricity_price_per_kwh,
+        "reservations": reservations_dict,
+    }
+    encoded_message = json.dumps(message_dict, default=str).encode()
+    logging.info("Sending (%s)", f'current market price and open reservations: {encoded_message}')
 
-    logging.info("Sending (%s)", f'current_electricity_price: {current_electricity_price_per_kw}')
-    encoded = str(current_electricity_price_per_kw).encode()
-    client.send(encoded)
+    client.send(encoded_message)
 
     while True:
         if (client.poll(REQUEST_TIMEOUT) & zmq.POLLIN) != 0:
@@ -34,6 +42,7 @@ for sequence in itertools.count():
                 break
             else:
                 logging.error("Malformed reply from server: %s", reply)
+
         logging.warning("No response from server")
         # Socket is confused. Close and remove it.
         client.setsockopt(zmq.LINGER, 0)
@@ -42,5 +51,5 @@ for sequence in itertools.count():
         # Create new connection
         client = context.socket(zmq.REQ)
         client.connect(server_url)
-        logging.info("Resending (%s)", encoded)
-        client.send(encoded)
+        logging.info("Resending (%s)", encoded_message)
+        client.send(encoded_message)

@@ -31,7 +31,7 @@ class BikeSpot:
 
     def _update_spot_state(self):
         """Simulates bike is staying/getting removed/just being parked at empty spot
-        Updates occupied state and reservation.
+        Updates occupied state and reservation state.
         """
         # update occupied state:
         # Handle cases that battery sensor has to be added or removed
@@ -44,6 +44,8 @@ class BikeSpot:
         if not old_occupied_state and self.occupied_sensor.occupied:
             # case spot was empty and is now taken by new bike
             self.bike_battery_sensor = BikeBatterySensor()
+        # update reservation state
+        self.reservation_state.end_reservation_if_expired()
 
     def _sense_bike_battery_level(self):
         """Returns current battery level of parked bike if spot is occupied."""
@@ -102,3 +104,7 @@ class ReservationState:
             self.last_reservation_id = self.reservation_id
             self.reservation_id = 0
             self.duration = 0
+
+    def end_reservation_if_expired(self):
+        if self.remaining_time <= 0:
+            self.end_reservation_if_exists()
