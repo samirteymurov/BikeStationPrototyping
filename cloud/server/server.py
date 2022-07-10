@@ -9,7 +9,7 @@ import zmq
 import json
 from dotenv import load_dotenv
 
-from cloud.models import CurrentSpotState, ReservationStatus, SpotStateData
+from cloud.models import CurrentSpotState, ReservationStatus, SpotStateData, CurrentElectricityState, ElectricityData
 
 load_dotenv()
 
@@ -79,6 +79,22 @@ for cycles in itertools.count():
                 spot_state.update_reservation_state(
                     reservation_status=ReservationStatus.no_reservation
                 )
+
+    # update electricity data state
+    if electricity_data:
+        latest_data = sorted(
+            electricity_data.values(), key=lambda d: d['datetime'], reverse=True
+        )[0]
+        current_state = CurrentElectricityState.get_current_state()
+        current_state.update_state(latest_data)
+        # CurrentElectricityState(
+        #     production=latest_data["production"],
+        #     feed_in=latest_data["feed_in"],
+        #     self_consumption=latest_data["self_consumption"],
+        #     consumption_saving=latest_data["consumption_saving"],
+        #     feed_in_revenue=latest_data["feed_in_revenue"],
+        # ).save_or_update()
+
     logging.info("Successfully updated state.")
 
     # persist all received readings to db
@@ -94,6 +110,21 @@ for cycles in itertools.count():
                 battery_level=reading["battery_level"]
             )
     logging.info(f"Saved readings {received_readings}")
+
+    # persist all received electricity data to db
+    received_data_items = []  # for monitoring purposes only
+    for item_id, electricity_data_item in electricity_data.items():
+        received_data_items.append(item_id)
+        ElectricityData(
+            data_item_id=int(item_id),
+            data_timestamp=convert_json_string_to_datetime(electricity_data_item["datetime"], False),
+            production=electricity_data_item["production"],
+            feed_in=electricity_data_item["feed_in"],
+            self_consumption=electricity_data_item["self_consumption"],
+            consumption_saving=electricity_data_item["consumption_saving"],
+            feed_in_revenue=electricity_data_item["feed_in_revenue"],
+        )
+    logging.info(f"Saved electricity data items {received_data_items}")
 
     # after making sure that all data have been processed send ok reply
     server.send(str(len(request)).encode())

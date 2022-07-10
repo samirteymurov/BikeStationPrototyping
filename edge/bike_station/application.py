@@ -59,10 +59,8 @@ class BikeStation:
                 self.feed_in = current_production - current_demand
                 self.self_consumption = current_demand
 
-    def calculate_feed_in_profit(self, current_market_price):
-        if current_market_price is None:
-            return "unknown"
-        return round(self.feed_in * current_market_price, 4)
+    def calculate_feed_in_revenue(self):
+        return round(self.feed_in * self.current_market_price, 4)
 
     def calculate_self_consumption_savings(self):
         return round(self.self_consumption * self.electricity_contract_price, 4)
@@ -117,12 +115,23 @@ class BikeStation:
                 print(f"Rejecting Reservation {reservation.reservation_id}")
                 reservation.update_to_unfeasible()
 
+    def update_electricity_status(self):
+        self.solar_panel_sensor.update_current_production()
+        self.decide_electricity_usage()
+        return {
+            "production": self.solar_panel_sensor.current_production,
+            "self_consumption": self.self_consumption,
+            "consumption_saving": self.calculate_self_consumption_savings(),
+            "feed_in": self.feed_in,
+            "feed_in_revenue": self.calculate_feed_in_revenue(),
+        }
+
     def run_station(self):
         spot_states = dict(
             (spot_id, spot.get_spot_state()) for spot_id, spot in self.spots.items()
         )
-        self.solar_panel_sensor.update_current_production()
-        self.decide_electricity_usage()
+        electricity_status = self.update_electricity_status()
+        models.ElectricityData(**electricity_status).add()
         print("\n-------------------------- Current Electricity info -----------------------------------------------------------")
         print(
             "{:<12} | {:<10} | {:<16} | {:<18} | {:<14} | {:<16}".format(
@@ -131,17 +140,17 @@ class BikeStation:
                 "Self-consumption",
                 "Consumption saving",
                 "Feed-in",
-                "Production Revenue",
+                "Feed-In Revenue",
             )
         )
         print(
             "{:<12} | {:<10} | {:<16} | {:<18} | {:<14} | {:<16} \n".format(
                 self.current_market_price,
-                self.solar_panel_sensor.current_production,
-                self.self_consumption,
-                self.calculate_self_consumption_savings(),
-                self.feed_in,
-                self.calculate_feed_in_profit(self.current_market_price),
+                electricity_status["production"],
+                electricity_status["self_consumption"],
+                electricity_status["consumption_saving"],
+                electricity_status["feed_in"],
+                electricity_status["feed_in_revenue"],
             )
         )
         print("\n---------------------------------------- Station info --------------------------------------------------------")
@@ -195,4 +204,4 @@ if __name__ == "__main__":
 
         # remove finished reservations from DB
         Reservation.clean_finished()
-        sleep(6)
+        sleep(4)

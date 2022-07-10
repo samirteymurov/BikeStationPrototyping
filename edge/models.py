@@ -10,6 +10,9 @@ from sqlalchemy.sql import func
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
+
+from edge.constants import ELECTRICITY_CONTRACT_KWH_PRICE
+
 load_dotenv()
 
 engine = create_engine(f'sqlite:////{os.getenv("sqlite_absolute_path")}', echo=False)
@@ -30,9 +33,7 @@ class Status(enum.Enum):
 class Constant(Base):
     __tablename__ = "constant"
     name = Column(String, primary_key=True)
-    integer_value = Column(Integer)
-    real_value = Column(REAL)
-    string_value = Column(String)
+    real_value = Column(REAL, default=ELECTRICITY_CONTRACT_KWH_PRICE)
 
     def save_or_update(self):
         session.merge(self)
@@ -93,6 +94,59 @@ class SpotSensorData(Base):
                 }
             )
         return summary_dict
+
+
+class ElectricityData(Base):
+    __tablename__ = "electricity_data"
+    data_item_id = Column(Integer, primary_key=True)
+    data_timestamp = Column(DateTime(timezone=True), server_default=func.now(tz=pytz.utc))
+    production = Column(Integer, nullable=False, default=0)
+    self_consumption = Column(Integer, nullable=False, default=0)
+    feed_in = Column(Integer, nullable=False, default=0)
+    consumption_saving = Column(REAL, nullable=False, default=0)
+    feed_in_revenue = Column(REAL, nullable=False, default=0)
+    sent_status = Column(Enum(Status), default=Status.created)
+
+    def add(self):
+        session.add(self)
+        session.commit()
+        return self
+
+    @staticmethod
+    def clean_processed():
+        session.query(ElectricityData).filter(
+            ElectricityData.sent_status == Status.processed
+        ).delete()
+        session.commit()
+
+    @staticmethod
+    def get_oldest_n_readings(n):
+        return session.query(ElectricityData).filter(
+            ElectricityData.sent_status == Status.created
+        ).limit(n).all()
+
+    @staticmethod
+    def set_to_processed(last_sent_item_id):
+        session.query(ElectricityData).filter(
+            ElectricityData.data_item_id <= last_sent_item_id
+        ).update({"sent_status": Status.processed})
+        session.commit()
+
+    @staticmethod
+    def make_query_dictionary(query):
+        data_dict = {}
+        for data_item in query:
+            item_id = data_item.data_item_id
+            data_dict[str(item_id)] = {
+                    "datetime": data_item.data_timestamp,
+                    "production": data_item.production,
+                    "self_consumption": data_item.self_consumption,
+                    "consumption_saving": data_item.consumption_saving,
+                    "feed_in": data_item.feed_in,
+                    "feed_in_revenue": data_item.feed_in_revenue,
+                }
+
+        return data_dict
 
 
 class ReservationStatus(enum.Enum):

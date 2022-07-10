@@ -177,4 +177,52 @@ class CurrentSpotState(Base):
         return self
 
 
+class CurrentElectricityState(Base):
+    """Represents most recent state of the station's electricity data known to the cloud component.
+    """
+    __tablename__ = "current_electricity_state"
+    pk = Column(Integer, primary_key=True)
+    production = Column(Integer, nullable=False, default=0)
+    self_consumption = Column(Integer, nullable=False, default=0)
+    feed_in = Column(Integer, nullable=False, default=0)
+    consumption_saving = Column(REAL, nullable=False, default=0)
+    feed_in_revenue = Column(REAL, nullable=False, default=0)
+
+    def save_or_update(self):
+        session.merge(self)
+        session.commit()
+        return self
+
+    def update_state(self, latest_data):
+        self.production = latest_data["production"]
+        self.feed_in = latest_data["feed_in"]
+        self.self_consumption = latest_data["self_consumption"]
+        self.consumption_saving = latest_data["consumption_saving"]
+        self.feed_in_revenue = latest_data["feed_in_revenue"]
+        self.save_or_update()
+
+    @staticmethod
+    def get_current_state():
+        return session.query(CurrentElectricityState).first()
+
+
+class ElectricityData(Base):
+    """This table is meant to store all received electricity data.
+    Can be used for data analysis e.g. to improve business model, functionality, etc.
+    """
+    __tablename__ = "electricity_data"
+    data_item_id = Column(Integer, primary_key=True)
+    data_timestamp = Column(DateTime(timezone=True), server_default=func.now(tz=pytz.utc))
+    production = Column(Integer, nullable=False, default=0)
+    self_consumption = Column(Integer, nullable=False, default=0)
+    feed_in = Column(Integer, nullable=False, default=0)
+    consumption_saving = Column(REAL, nullable=False, default=0)
+    feed_in_revenue = Column(REAL, nullable=False, default=0)
+
+    def add(self):
+        session.add(self)
+        session.commit()
+        return self
+
+
 Base.metadata.create_all(engine)

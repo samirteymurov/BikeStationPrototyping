@@ -4,7 +4,7 @@ from time import sleep
 
 from cloud.reservation_maker import ReservationMaker
 from cloud.constants import NUMBER_OF_SPOTS
-from cloud.models import CurrentSpotState, ReservationStatus
+from cloud.models import CurrentSpotState, ReservationStatus, CurrentElectricityState
 
 
 def initialize_spot_states_if_none():
@@ -14,7 +14,7 @@ def initialize_spot_states_if_none():
             CurrentSpotState(spot_id=spot_id).make_inital_entry()
 
 
-def display_station_state():
+def display_spots_state():
     # update expired reservations before displaying
     CurrentSpotState.update_all_expired_reservations()
     print("\n \n---------------------------------------- Station State ---------------------------------------------------------------")
@@ -46,13 +46,37 @@ def display_station_state():
             )
         )
 
+def display_electricity_state():
+    electricity_state = CurrentElectricityState.get_current_state()
+    print(
+        "\n-------------------------- Current Electricity info -----------------------------------------------------------")
+    print(
+        "{:<10} | {:<16} | {:<18} | {:<14} | {:<16}".format(
+            "Production",
+            "Self-consumption",
+            "Consumption saving",
+            "Feed-in",
+            "Feed-In Revenue",
+        )
+    )
+    print(
+        "{:<10} | {:<16} | {:<18} | {:<14} | {:<16} \n".format(
+            electricity_state.production,
+            electricity_state.self_consumption,
+            electricity_state.consumption_saving,
+            electricity_state.feed_in,
+            electricity_state.feed_in_revenue,
+        )
+    )
+
 
 if __name__ == "__main__":
+    CurrentElectricityState().save_or_update()  # initialize electricity state
     initialize_spot_states_if_none()
     while True:
-        # TODO: display  electricity consumption state
         # Display current station state known to cloud component
-        display_station_state()
+        display_electricity_state()
+        display_spots_state()
         reservable_spots = CurrentSpotState.get_reservable_spots()
         if not reservable_spots:
             print("No spots to reserve..")
