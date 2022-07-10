@@ -4,7 +4,7 @@ import os
 import json
 
 import pytz
-from sqlalchemy import Column, Integer, DateTime, Boolean, Enum, REAL, String, false
+from sqlalchemy import Column, Integer, DateTime, Boolean, Enum, REAL, String, false, true
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
 from sqlalchemy import create_engine
@@ -116,6 +116,21 @@ class Reservation(Base):
         session.commit()
         return self
 
+    def reservation_expired(self):
+        # Request expires if after receiving the request the full duration time has already passed
+        if self.status == ReservationStatus.reservation_requested:
+            return int(
+                self.duration_in_seconds
+                - (datetime.datetime.utcnow() - self.received_timestamp).total_seconds()
+            ) <= 0
+        # Confirmed requests expire when full duration time has passed after confirmation
+        if self.status == ReservationStatus.reservation_confirmed:
+            return int(
+                self.duration_in_seconds
+                - (datetime.datetime.utcnow() - self.confirmed_at).total_seconds()
+            ) <= 0
+        return False
+
     def update_to_confirmed(self, confirmation_timestamp):
         self.status = ReservationStatus.reservation_confirmed
         self.confirmed_at = confirmation_timestamp
@@ -131,25 +146,37 @@ class Reservation(Base):
 
     @staticmethod
     def clean_finished():
-        session.query(Reservation).filter(Reservation.response_sent).delete()
+        # delete all rejected reservations which have been communicated already
+        session.query(Reservation).filter(
+            Reservation.status == ReservationStatus.reservation_unfeasible,
+            Reservation.response_sent == true()
+        ).delete()
+        # get confirmed and communicated reservations and clean if expired
+        for reservation in session.query(Reservation).filter(
+            Reservation.status == ReservationStatus.reservation_confirmed,
+            Reservation.response_sent == true()
+        ).all():
+            if reservation.reservation_expired():
+                session.delete(reservation)
         session.commit()
 
     @staticmethod
     def get_open_reservation_requests():
         return session.query(Reservation).filter(Reservation.status == ReservationStatus.reservation_requested).all()
 
-    # @staticmethod
-    # def clean_when_bike_removed(spot_id):
-    #     """Delete"""
-    #     session.query(Reservation).filter(
-    #         Reservation.spot_id == spot_id,
-    #         Reservation.status == ReservationStatus.reservation_confirmed
-    #     ).delete()
-    #     session.commit()
-
     @staticmethod
     def get_reservation_by_id(reservation_id):
         return session.query(Reservation).get(reservation_id)
+
+    @staticmethod
+    def get_confirmed_reservations():
+        """Get confirmed and communicated reservations
+        Note: to be used to get reservation state after crash of application
+        """
+        return session.query(Reservation).filter(
+            Reservation.status == ReservationStatus.reservation_confirmed,
+            Reservation.response_sent == true()
+        ).all()
 
     @staticmethod
     def get_confirmed_reservation_requests():

@@ -19,7 +19,6 @@ client.connect(server_url)
 
 for sequence in itertools.count():
     # TODO add electricity info to message
-    #time.sleep(2)
     # get oldest n sensor readings from db
     queued_readings = SpotSensorData.get_oldest_n_readings(10)
     confirmed_reservations = Reservation.get_confirmed_reservation_requests()
@@ -30,7 +29,7 @@ for sequence in itertools.count():
             and len(rejected_reservations) == 0
     ):
         logging.info("No new data to be sent. Waiting...")
-        time.sleep(4)
+        time.sleep(1)
         continue
 
     sensor_data_dict = SpotSensorData.make_query_dictionary(queued_readings)

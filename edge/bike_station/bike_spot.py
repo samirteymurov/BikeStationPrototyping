@@ -111,3 +111,8 @@ class ReservationState:
     def end_reservation_if_expired(self):
         if self.remaining_time <= 0:
             self.end_reservation_if_exists()
+
+    def recover_from_db(self, reservation_entry: Reservation):
+        self.reservation_id = reservation_entry.reservation_id
+        self.duration = reservation_entry.duration_in_seconds
+        self.reservation_created_at = reservation_entry.confirmed_at

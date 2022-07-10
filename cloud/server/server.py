@@ -57,12 +57,16 @@ for cycles in itertools.count():
             # remove reservations for already removed bikes
             if not is_occupied and spot_state.reservation_status != ReservationStatus.no_reservation:
                 spot_state.end_reservation()
+
         # update reservation state if responses have been received
+        logging.info(f"Confirmed reservations: {list(confirmed_reservations.keys())}")
+        logging.info(f"Rejected reservations: {rejected_reservations}")
         spot_reservation_id = spot_state.reservation_id
+
+        # only update reservation state of spot, if reservation still pending on cloud part
         if spot_reservation_id:
             reservation_id_key = str(spot_reservation_id)
             if reservation_id_key in confirmed_reservations.keys():
-                logging.info(f"Reservation {reservation_id_key} has been confirmed.")
                 valid_from_datetime = convert_json_string_to_datetime(
                     confirmed_reservations[reservation_id_key], True
                 )
@@ -72,7 +76,6 @@ for cycles in itertools.count():
                     valid_from=valid_from_datetime,
                 )
             if spot_reservation_id in rejected_reservations:
-                logging.info(f"Reservation {spot_reservation_id} for spot {spot_id} was not feasible.")
                 spot_state.update_reservation_state(
                     reservation_status=ReservationStatus.no_reservation
                 )

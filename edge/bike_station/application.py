@@ -99,6 +99,12 @@ class BikeStation:
         """Make reservations and update changes in DB to enable confirmation message for cloud component"""
         open_reservations = Reservation.get_open_reservation_requests()
         for reservation in open_reservations:
+            # check if validity of request has expired already
+            if reservation.reservation_expired():
+                print("Reservation request has expired. Will be rejected.")
+                reservation.update_to_unfeasible()
+                continue
+            # try to make reservation
             reservation_status, reservation_created_at = self.reserve_spot(
                 spot_id=reservation.spot_id,
                 reservation_id=reservation.reservation_id,
@@ -117,7 +123,7 @@ class BikeStation:
         )
         self.solar_panel_sensor.update_current_production()
         self.decide_electricity_usage()
-        print("\n-------------------------- Current Electricity info --------------------------------")
+        print("\n-------------------------- Current Electricity info -----------------------------------------------------------")
         print(
             "{:<12} | {:<10} | {:<16} | {:<18} | {:<14} | {:<16}".format(
                 "Market Price",
@@ -138,16 +144,15 @@ class BikeStation:
                 self.calculate_feed_in_profit(self.current_market_price),
             )
         )
-        print("\n---------------------------------------- Station info --------------------------------------")
+        print("\n---------------------------------------- Station info --------------------------------------------------------")
         print(
-            "{:<12} | {:<8} | {:<18} | {:<8} | {:<26} | {:<22} | {:<19}".format(
+            "{:<12} | {:<8} | {:<18} | {:<8} | {:<22} | {:<26} ".format(
                 "Spot ID",
                 "Occupied",
                 "Bike Battery Level",
                 "Reserved",
-                "Remaining Reservation Time",
                 "Current Reservation ID",
-                "Last Reservation ID"
+                "Remaining Reservation Time",
             )
         )
         for spot_id, spot_state in spot_states.items():
@@ -155,14 +160,13 @@ class BikeStation:
             models.SpotSensorData(spot_id=spot_id, is_occupied=spot_state["occupied"],
                                   battery_level=battery_level).add()
             print(
-                "{:<12} | {:<8} | {:<18} | {:<8} | {:<26} | {:<22} | {:<19}".format(
+                "{:<12} | {:<8} | {:<18} | {:<8} | {:<22} | {:<26} ".format(
                     spot_id,
                     spot_state["occupied"],
                     "" if not battery_level else str(round(battery_level * 100, 2)),
                     spot_state["reserved"],
-                    spot_state.get("remaining_reservation_time") or "",
                     spot_state.get("reservation_id") or "",
-                    spot_state.get("last_reservation_id") or "",
+                    spot_state.get("remaining_reservation_time") or "",
                 )
             )
 
@@ -173,14 +177,22 @@ if __name__ == "__main__":
     Constant(name='current_market_price', real_value=ELECTRICITY_CONTRACT_KWH_PRICE).save_or_update()
     # Setup station
     station = BikeStation()
+    # If starting up happens after crash, there can be non-expired reservations that need to be added to state
+    confirmed_reservations = Reservation.get_confirmed_reservations()
+    for reservation in confirmed_reservations:
+        if not reservation.reservation_expired():
+            station.spots[reservation.spot_id].reservation_state.recover_from_db(reservation)
+
     while True:
         print(
-            "\n \n####################################### GETTING NEW STATION STATE ##################################"
+            "\n \n------------------------------------------ GETTING NEW STATION STATE --------------------------------------"
         )
         station.run_station()
         print(
-            "\n \n####################################### GETTING RESERVATIONS ##################################"
+            "\n \n------------------------------------------ GETTING RESERVATIONS --------------------------------------------"
         )
         station.perform_reservations()
 
+        # remove finished reservations from DB
+        Reservation.clean_finished()
         sleep(6)

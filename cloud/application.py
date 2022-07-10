@@ -17,15 +17,14 @@ def initialize_spot_states_if_none():
 def display_station_state():
     # update expired reservations before displaying
     CurrentSpotState.update_all_expired_reservations()
-    print("\n \n---------------------------------------- Station State --------------------------------------")
+    print("\n \n---------------------------------------- Station State ---------------------------------------------------------------")
     print(
-        "{:<12} | {:<8} | {:<18} | {:<21} |  {:<14} | {:<32} | {:<9}".format(
+        "{:<12} | {:<8} | {:<18} | {:<21} |  {:<14} | {:<9}".format(
             "Spot ID",
             "Occupied",
             "Bike Battery Level",
             "Reservation Status",
             "Reservation ID",
-            "Reservation confirmed at",
             "Remaining",
         )
     )
@@ -37,13 +36,12 @@ def display_station_state():
                         (datetime.datetime.utcnow() - spot_state.reservation_valid_from).total_seconds()
                 )
         print(
-            "{:<12} | {:<8} | {:<18} | {:<21} | {:<14} | {:<32} | {:<9}".format(
+            "{:<12} | {:<8} | {:<18} | {:<21} | {:<14} | {:<9}".format(
                 str(spot_state.spot_id),
                 str(spot_state.is_occupied),
                 "" if not spot_state.battery_level else str(round(spot_state.battery_level * 100, 2)),
                 spot_state.reservation_status.name,
                 str(spot_state.reservation_id or ""),
-                str(spot_state.reservation_valid_from or ""),
                 remaining_time or "",
             )
         )
@@ -61,10 +59,10 @@ if __name__ == "__main__":
             sleep(5)
             continue
 
-        # make random decision whether to reserve a spot or not
-        reserve_spot = bool(random.getrandbits(1))
+        # make decision whether to reserve a spot or not with 33% likelihood of making reservation
+        reserve_spot = random.random() <= 0.33
         if reserve_spot:
-            print("\n----------------------------------- Creating Reservation ------------------------------------------")
+            print("\n----------------------------------- Creating Reservation ---------------------------------------------------------")
 
             # randomly choose one of the reservable spots and a duration time
             spot = reservable_spots[random.randint(0, len(reservable_spots)-1)]
@@ -80,5 +78,5 @@ if __name__ == "__main__":
                     duration,
                 )
             )
-        sleep(5)
+        sleep(2)
 
