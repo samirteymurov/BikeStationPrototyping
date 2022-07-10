@@ -11,8 +11,8 @@ class SpotOccupiedSensor:
         If occupied, it is more likely it stays occupied.
         """
         if self.occupied:
-            # If spot is occupied, with 65% probability it is stays occupied.
-            self.occupied = random.random() <= 0.65
+            # If spot is occupied, with 85% probability it is stays occupied.
+            self.occupied = random.random() <= 0.85
         else:
             # If spot is not occupied, getting occupied is a 50-50 chance
             self.occupied = bool(random.getrandbits(1))
