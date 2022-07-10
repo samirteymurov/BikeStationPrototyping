@@ -71,34 +71,45 @@ class BikeStation:
         spot_to_reserve = self.spots.get(spot_id)
         if (
             spot_to_reserve is not None
+            and spot_to_reserve.occupied_sensor.occupied
             and not spot_to_reserve.reservation_state.is_reserved
-            and not spot_to_reserve.occupied_sensor.occupied
+
         ):
-            spot_to_reserve.reserve(reservation_id, duration)
-            logging.info(
-                f"Reservation made for spot {spot_id} with reservation id {reservation_id} for {duration} seconds."
+            # spot can be reserved
+            created_at = spot_to_reserve.reserve(reservation_id, duration)
+            print(
+                f"Reservation made for spot {spot_id} at {created_at} with reservation id {reservation_id} for {duration} seconds."
             )
-            return ReservationStatus.reservation_confirmed, spot_to_reserve.reservation_state.reservation_created_at
-        elif spot_to_reserve.occupied_sensor.occupied:
-            logging.warning(f"Cannot make reservation for spot {spot_id}. Spot is not occupied anymore.")
+            return ReservationStatus.reservation_confirmed, created_at
+        elif not spot_to_reserve.occupied_sensor.occupied:
+            logging.warning(
+                f"Cannot make reservation for spot {spot_id} (reservation {reservation_id})."
+                f" Spot is not occupied anymore."
+                )
+            # %a, %d %b %Y %H:%M:%S UTC'
             return ReservationStatus.reservation_unfeasible, None
         else:
-            logging.warning(f"Cannot make reservation for spot {spot_id}. Is already reserved.")
+            logging.warning(
+                f"Cannot make reservation for spot {spot_id} (reservation {reservation_id})."
+                f" Is already reserved."
+            )
             return ReservationStatus.reservation_unfeasible, None
 
     def perform_reservations(self):
         """Make reservations and update changes in DB to enable confirmation message for cloud component"""
         open_reservations = Reservation.get_open_reservation_requests()
         for reservation in open_reservations:
-            reservation_state, reservation_created_at = self.reserve_spot(
+            reservation_status, reservation_created_at = self.reserve_spot(
                 spot_id=reservation.spot_id,
                 reservation_id=reservation.reservation_id,
                 duration=reservation.duration_in_seconds
             )
-            if reservation_state == ReservationStatus.reservation_confirmed:
-                reservation.set_to_confirmed(reservation_state, reservation_created_at)
+            if reservation_status == ReservationStatus.reservation_confirmed:
+                print(f"Confirming Reservation {reservation.reservation_id}")
+                reservation.update_to_confirmed(reservation_created_at)
             else:
-                reservation.set_to_unfeasible()
+                print(f"Rejecting Reservation {reservation.reservation_id}")
+                reservation.update_to_unfeasible()
 
     def run_station(self):
         spot_states = dict(
@@ -148,15 +159,12 @@ class BikeStation:
                     spot_id,
                     spot_state["occupied"],
                     "" if not battery_level else str(round(battery_level * 100, 2)),
-                    # TODO do we need below fields?
                     spot_state["reserved"],
                     spot_state.get("remaining_reservation_time") or "",
                     spot_state.get("reservation_id") or "",
                     spot_state.get("last_reservation_id") or "",
                 )
             )
-
-
 
 
 if __name__ == "__main__":
@@ -170,12 +178,9 @@ if __name__ == "__main__":
             "\n \n####################################### GETTING NEW STATION STATE ##################################"
         )
         station.run_station()
-        print("\n------------------------------Making Reservations--------------------------------------")
-        # station.reserve_spot(
-        #     spot_id=random.randint(0, 4),
-        #     code_to_unlock=random.randint(1000, 9999),
-        #     duration=random.randint(30, 120),
-        # )
-        sleep(2)
+        print(
+            "\n \n####################################### GETTING RESERVATIONS ##################################"
+        )
         station.perform_reservations()
-        sleep(3)
+
+        sleep(6)

@@ -4,7 +4,7 @@ import os
 import json
 
 import pytz
-from sqlalchemy import Column, Integer, DateTime, Boolean, Enum, REAL, String
+from sqlalchemy import Column, Integer, DateTime, Boolean, Enum, REAL, String, false
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
 from sqlalchemy import create_engine
@@ -61,27 +61,38 @@ class SpotSensorData(Base):
 
     @staticmethod
     def clean_processed():
-        session.query(SpotSensorData).filter(SpotSensorData.sent_status==Status.processed).delete()
+        session.query(SpotSensorData).filter(
+            SpotSensorData.sent_status == Status.processed
+        ).delete()
         session.commit()
 
     @staticmethod
     def get_oldest_n_readings(n):
-        # TODO shouldn't this be latest instead?
-        return session.query(SpotSensorData).filter(SpotSensorData.sent_status==Status.created).limit(n).all()
+        return session.query(SpotSensorData).filter(
+            SpotSensorData.sent_status == Status.created
+        ).limit(n).all()
 
     @staticmethod
     def set_to_processed(last_read_id):
-        session.query(SpotSensorData).filter(SpotSensorData.read_id <= last_read_id).update({"sent_status": Status.processed})
+        session.query(SpotSensorData).filter(
+            SpotSensorData.read_id <= last_read_id
+        ).update({"sent_status": Status.processed})
         session.commit()
 
     @staticmethod
-    def encode_query(query):
+    def make_query_dictionary(query):
         summary_dict = {'0': [], '1': [], '2': [], '3': [], '4': []}
         for reading in query:
             spot_id = reading.spot_id
             summary_dict[str(spot_id)].append(
-                [{'datetime': reading.read_timestamp, 'is_occupied': reading.is_occupied}])
-        return json.dumps(summary_dict, default=str).encode()
+                {
+                    'datetime': reading.read_timestamp,
+                    'reading_id': reading.read_id,
+                    'is_occupied': reading.is_occupied,
+                    'battery_level': reading.battery_level,
+                }
+            )
+        return summary_dict
 
 
 class ReservationStatus(enum.Enum):
@@ -94,23 +105,28 @@ class Reservation(Base):
     __tablename__ = "reservations"
     reservation_id = Column(Integer, primary_key=True)
     received_timestamp = Column(DateTime(timezone=True), server_default=func.now(tz=pytz.utc))
-    created_timestamp = Column(DateTime(timezone=True))
+    confirmed_at = Column(DateTime(timezone=True))
     spot_id = Column(Integer, nullable=False)
     duration_in_seconds = Column(Integer, nullable=False)
     status = Column(Enum(ReservationStatus), default=ReservationStatus.reservation_requested)
+    response_sent = Column(Boolean, default=False, nullable=False)
 
     def add(self):
         session.add(self)
         session.commit()
         return self
 
-    def set_to_confirmed(self, created_timestamp):
+    def update_to_confirmed(self, confirmation_timestamp):
         self.status = ReservationStatus.reservation_confirmed
-        self.created_timestamp = created_timestamp
+        self.confirmed_at = confirmation_timestamp
         session.commit()
 
-    def set_to_unfeasible(self):
+    def update_to_unfeasible(self):
         self.status = ReservationStatus.reservation_unfeasible
+        session.commit()
+
+    def update_response_sent(self):
+        self.response_sent = True
         session.commit()
 
     @staticmethod
@@ -122,12 +138,42 @@ class Reservation(Base):
     def get_open_reservation_requests():
         return session.query(Reservation).filter(Reservation.status == ReservationStatus.reservation_requested).all()
 
+    # @staticmethod
+    # def clean_when_bike_removed(spot_id):
+    #     """Delete"""
+    #     session.query(Reservation).filter(
+    #         Reservation.spot_id == spot_id,
+    #         Reservation.status == ReservationStatus.reservation_confirmed
+    #     ).delete()
+    #     session.commit()
+
     @staticmethod
-    def clean_when_bike_removed(spot_id):
-        session.query(Reservation).filter(
-            Reservation.spot_id == spot_id and Reservation.status == ReservationStatus.reservation_confirmed
-        ).delete()
-        session.commit()
+    def get_reservation_by_id(reservation_id):
+        return session.query(Reservation).get(reservation_id)
+
+    @staticmethod
+    def get_confirmed_reservation_requests():
+        """Gets processed and confirmed reservation requests that haven't been communicated back."""
+        return session.query(Reservation).filter(
+            Reservation.status == ReservationStatus.reservation_confirmed,
+            Reservation.response_sent == false()
+        ).all()
+
+    @staticmethod
+    def make_confirmed_reservations_dict(query):
+        confirmed_reservations_dict = {}
+        for reservation in query:
+            confirmed_reservations_dict[str(reservation.reservation_id)] = reservation.confirmed_at
+        return confirmed_reservations_dict
+
+    @staticmethod
+    def get_rejected_reservation_requests():
+        """Gets processed but unfeasible reservation requests that haven't been communicated back.
+        """
+        return session.query(Reservation).filter(
+            Reservation.status == ReservationStatus.reservation_unfeasible,
+            Reservation.response_sent == false()
+        ).all()
 
 
 Base.metadata.create_all(engine)

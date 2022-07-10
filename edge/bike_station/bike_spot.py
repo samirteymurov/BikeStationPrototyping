@@ -3,6 +3,7 @@ import datetime
 import pytz as pytz
 
 from edge.bike_station.sensors import SpotOccupiedSensor, BikeBatterySensor
+from edge.models import Reservation
 
 
 class BikeSpot:
@@ -27,7 +28,7 @@ class BikeSpot:
     def reserve(self, reservation_id, duration):
         """Create reservation for spot."""
         if self.occupied_sensor.occupied and not self.reservation_state.is_reserved:
-            self.reservation_state.make_reservation(reservation_id, duration)
+            return self.reservation_state.make_reservation(reservation_id, duration)
 
     def _update_spot_state(self):
         """Simulates bike is staying/getting removed/just being parked at empty spot
@@ -40,6 +41,7 @@ class BikeSpot:
         if old_occupied_state and not self.occupied_sensor.occupied:
             # case bike has been removed
             self.bike_battery_sensor = None
+            #Reservation.clean_when_bike_removed(self.spot_id) TODO remove if not required
             self.reservation_state.end_reservation_if_exists()
         if not old_occupied_state and self.occupied_sensor.occupied:
             # case spot was empty and is now taken by new bike
@@ -88,7 +90,7 @@ class ReservationState:
     def remaining_time(self):
         if not self.is_reserved:
             return 0
-        return (
+        return int(
             self.duration
             - (datetime.datetime.utcnow() - self.reservation_created_at).total_seconds()
         )
@@ -97,6 +99,7 @@ class ReservationState:
         self.reservation_created_at = datetime.datetime.utcnow()
         self.reservation_id = reservation_id
         self.duration = duration
+        return self.reservation_created_at
 
     def end_reservation_if_exists(self):
         if self.is_reserved:

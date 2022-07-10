@@ -2,6 +2,8 @@ import json
 import os, itertools
 import logging
 import random
+from time import sleep
+
 import zmq
 from dotenv import load_dotenv
 
@@ -19,6 +21,7 @@ client = context.socket(zmq.REQ)
 client.connect(server_url)
 
 for sequence in itertools.count():
+    sleep(5)
     current_electricity_price_per_kwh = round(random.uniform(0.27, 0.68), 4)
     pending_reservations = ReservationRequest.get_pending_reservations()
     reservations_dict = ReservationRequest.make_query_dictionary(pending_reservations)
@@ -28,21 +31,24 @@ for sequence in itertools.count():
         "reservations": reservations_dict,
     }
     encoded_message = json.dumps(message_dict, default=str).encode()
-    logging.info("Sending (%s)", f'current market price and open reservations: {encoded_message}')
+    logging.info("Sending current market price and open reservations.")
 
     client.send(encoded_message)
 
     while True:
         if (client.poll(REQUEST_TIMEOUT) & zmq.POLLIN) != 0:
             reply = client.recv()
-            print(reply)
+            #print(reply)
             if reply.decode() == 'ok':  # sanity check with length of sent object
-                logging.info("Server replied OK (%s)", reply)
-                # status of sent records need to be set to "processed"
+                logging.info("Server replied OK")
+                # status of sent reservations need to be set to "processed"
+                for reservation in pending_reservations:
+                    reservation.set_to_processed()
                 break
             else:
                 logging.error("Malformed reply from server: %s", reply)
 
+        # TODO after x number of resend tries, break to renew information (market price, reservations,..)
         logging.warning("No response from server")
         # Socket is confused. Close and remove it.
         client.setsockopt(zmq.LINGER, 0)

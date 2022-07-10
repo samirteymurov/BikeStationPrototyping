@@ -23,20 +23,26 @@ for cycles in itertools.count():
     current_market_price = request_dict.get("current_market_price")
     if not current_market_price:
         normal_request = False
-        logging.error("Current market price not provided, using default value..")
+        logging.error("Malformed request: Current market price not provided, using default value..")
         current_market_price = ELECTRICITY_CONTRACT_KWH_PRICE
+    else:
+        logging.info(f"Received current market price: {current_market_price}")
     # write it to constants table so that application can read it
     Constant(name='current_market_price', real_value=current_market_price).save_or_update()
 
     reservations = request_dict.get("reservations")
     for reservation_id, reservation_details in reservations.items():
+        spot_id = reservation_details.get("spot_id")
+        duration = reservation_details.get("duration")
+        logging.info(f"Received reservation {reservation_id} for spot {spot_id}, duration: {duration}")
         # create entry for open reservations that have not been received yet
-        if not Reservation.query().get(reservation_id):
+        if not Reservation.get_reservation_by_id(reservation_id):
+            logging.debug(f"Saving reservation {reservation_id}")
             try:
                 Reservation(
                     reservation_id=reservation_id,
-                    spot_id=reservation_details.get("spot_id"),
-                    duration_in_seconds=reservation_details.get("duration"),
+                    spot_id=spot_id,
+                    duration_in_seconds=duration,
                 ).add()
             except Exception as e:
                 logging.error(
@@ -45,9 +51,10 @@ for cycles in itertools.count():
                 )
                 normal_request = False
 
-    print(request)
+
+    #print(request)
     if normal_request:
-        logging.info("Normal request (%s)", request)
+        logging.info("Normal request.")
     # time.sleep(1)
     # after making sure that all data have been processed send ok reply
     server.send('ok'.encode())
