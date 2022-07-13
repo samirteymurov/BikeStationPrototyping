@@ -1,7 +1,11 @@
 # Fog Computing: Prototyping Assignment - E-Bike Station
 
 ## Usage
-Move cloud and edge folders to the respective machines and change ips and ports in .env files correspondingly.
+Move cloud and edge folders to the respective machines and change ips and ports in .env files correspondingly. <br />
+`!` From inside both folder (/cloud and /edge), set PYTHONPATH environment variable to the parent folder to avoid possible module import errors with:
+```
+export PYTHONPATH='..'
+```
 ### On the edge
 ```
 python bike_station/application.py
