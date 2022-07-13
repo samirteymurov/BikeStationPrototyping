@@ -14,7 +14,7 @@ from models import Constant, Reservation
 logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.INFO)
 context = zmq.Context()
 server = context.socket(zmq.REP)
-print(os.getenv('bind_address'))
+logging.info('Listening to the incoming requests...')
 server.bind(os.getenv("bind_address"))
 for cycles in itertools.count():
     normal_request = True
@@ -52,7 +52,6 @@ for cycles in itertools.count():
                 normal_request = False
 
 
-    #print(request)
     if normal_request:
         logging.info("Normal request.")
     # time.sleep(1)

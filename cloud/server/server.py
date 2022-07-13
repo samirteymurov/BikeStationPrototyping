@@ -17,7 +17,7 @@ logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.INFO)
 
 context = zmq.Context()
 server = context.socket(zmq.REP)
-print(os.getenv('bind_address'))
+logging.info('Listening to the incoming requests...')
 server.bind(os.getenv("bind_address"))
 
 
@@ -86,6 +86,12 @@ for cycles in itertools.count():
             electricity_data.values(), key=lambda d: d['datetime'], reverse=True
         )[0]
         current_state = CurrentElectricityState.get_current_state()
+
+        while current_state is None:
+            logging.info('Database is empty. Waiting for some information')
+            time.sleep(3)
+            current_state = CurrentElectricityState.get_current_state()
+
         current_state.update_state(latest_data)
         # CurrentElectricityState(
         #     production=latest_data["production"],
