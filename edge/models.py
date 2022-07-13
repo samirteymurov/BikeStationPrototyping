@@ -15,7 +15,7 @@ from edge.constants import ELECTRICITY_CONTRACT_KWH_PRICE
 
 load_dotenv()
 
-engine = create_engine(f'sqlite:////{os.getenv("sqlite_absolute_path")}', echo=False)
+engine = create_engine(f'sqlite:///sqlite.db', echo=False)  # sqlite db relative path
 Session = sessionmaker(bind=engine)
 # create a Session
 session = Session()

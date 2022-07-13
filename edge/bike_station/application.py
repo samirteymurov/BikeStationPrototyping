@@ -200,6 +200,4 @@ if __name__ == "__main__":
         )
         station.perform_reservations()
 
-        # remove finished reservations from DB
-        Reservation.clean_finished()
         sleep(4)
