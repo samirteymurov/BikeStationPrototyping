@@ -7,7 +7,7 @@ from edge.models import Reservation
 
 
 class BikeSpot:
-    """Virtual sensor for one bike spot."""
+    """Virtual representation of one bike spot."""
 
     def __init__(self, spot_id):
         self.spot_id = spot_id

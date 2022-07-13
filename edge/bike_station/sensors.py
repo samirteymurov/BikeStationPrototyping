@@ -28,8 +28,6 @@ class BikeBatterySensor:
     def _update_battery_level(self):
         """Increases battery level depending on seconds passed since last reading.
         No effect on battery level, if battery is fully charged
-        Returns:
-            updated battery level
         """
         now = datetime.datetime.utcnow()
         seconds_passed = (now - self.last_sensed).total_seconds()

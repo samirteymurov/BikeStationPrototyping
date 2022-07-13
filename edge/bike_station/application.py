@@ -23,7 +23,6 @@ class BikeStation:
         # solar panel's production capacity is abstracted to equal exactly the demand
         # of the fully occupied station, i.e. number_of_spots
         self.solar_panel_sensor = SolarPanelSensor(production_capacity=number_of_spots)
-        # self.electricity_contract_price = 0.4  # not really based on real world
         self.decide_electricity_usage()
 
     def get_number_of_occupied_spots(self):
@@ -38,7 +37,6 @@ class BikeStation:
         self.current_market_price = models.Constant.get_real_value_by_name('current_market_price')
         current_demand = self.get_number_of_occupied_spots()
         current_production = self.solar_panel_sensor.current_production
-
         if (
             current_demand == 0
             or self.electricity_contract_price < self.current_market_price

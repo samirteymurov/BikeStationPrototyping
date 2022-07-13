@@ -70,7 +70,6 @@ for sequence in itertools.count():
             else:
                 logging.error("Malformed reply from server: %s", reply)
                 continue
-
         # {REQUEST_TIMEOUT} seconds passed, but no results yet
         logging.warning("No response from server")
         # Socket is confused. Close and remove it.

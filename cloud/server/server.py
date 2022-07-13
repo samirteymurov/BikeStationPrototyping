@@ -87,13 +87,6 @@ for cycles in itertools.count():
         )[0]
         current_state = CurrentElectricityState.get_current_state()
         current_state.update_state(latest_data)
-        # CurrentElectricityState(
-        #     production=latest_data["production"],
-        #     feed_in=latest_data["feed_in"],
-        #     self_consumption=latest_data["self_consumption"],
-        #     consumption_saving=latest_data["consumption_saving"],
-        #     feed_in_revenue=latest_data["feed_in_revenue"],
-        # ).save_or_update()
 
     logging.info("Successfully updated state.")
 
